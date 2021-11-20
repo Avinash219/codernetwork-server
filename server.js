@@ -27,7 +27,7 @@ const PORT = 3000;
 
 var path = require('path');
 
-app.use('/authenticate', authenticateRouter);
+app.use('/api/authenticate', authenticateRouter);
 
 app.listen(PORT, () => {
   console.log(`Server is running on ${PORT}`);
