@@ -10,26 +10,35 @@ const {
 } = require('../Config/nodemailer.config');
 const PasswordReset = require('../Model/PasswordReset');
 const _ = require('underscore');
+const CustomError = require('../Middleware/Error/CustomError');
+const clientErrorHandler = require('../Middleware/Error/clientErrorHandler');
 
 module.exports = {
-  login: (request, response) => {
+  login: (request, response, next) => {
     const { email, password } = request.body;
     User.findOne({ email })
       .then((user) => {
         if (!user) {
-          return response.status(StatusCodes.BAD_REQUEST).send({
-            error: 'User with email does not exist! Please signup',
-          });
-        }
-        if (user.status !== 'Active') {
-          return response.status(StatusCodes.UNAUTHORIZED).send({
-            error: 'Please validate your email before login.',
-          });
-        }
-        if (!user.validatePassword(password)) {
-          return response.status(StatusCodes.BAD_REQUEST).send({
-            error: 'Email and password do not match',
-          });
+          return next(
+            new CustomError(
+              StatusCodes.BAD_REQUEST,
+              'User with email does not exist! Please signup'
+            )
+          );
+        } else if (user.status !== 'Active') {
+          return next(
+            new CustomError(
+              StatusCodes.UNAUTHORIZED,
+              'Please confirm your email before login.'
+            )
+          );
+        } else if (!user.validatePassword(password)) {
+          return next(
+            new CustomError(
+              StatusCodes.BAD_REQUEST,
+              'Email and password do not match'
+            )
+          );
         }
         const token = jwt.sign(
           {
@@ -37,7 +46,7 @@ module.exports = {
             id: user._id,
           },
           'AVINASH',
-          { expiresIn: 60 * 60 }
+          { expiresIn: 60 * 60 * 24 }
         );
         const { _id, username, name, email, role } = user;
         return response.status(StatusCodes.OK).send({
@@ -46,106 +55,70 @@ module.exports = {
         });
       })
       .catch((error) => {
-        return response.status(StatusCodes.BAD_REQUEST).send({
-          error: error,
-        });
+        next(error);
       });
   },
-  signup: async (request, response) => {
-    User.findOne({ email: request.body.email })
-      .then((user) => {
-        if (user) {
-          return response.status(StatusCodes.BAD_REQUEST).send({
-            error: 'Email already taken',
-          });
-        }
-        const { name, email, password } = request.body;
-        let username = shortid.generate();
-        let profile = `http://localhost:4200/user/${username}`;
-        let confirmationCode =
-          Date.now().toString(36) + Math.random().toString(36).substr(2);
-        console.log('Confirm', confirmationCode);
-        const newUser = new User({
-          name,
-          email,
-          password,
-          profile,
-          username,
-          confirmationCode,
-        });
-        newUser.save((err, success) => {
-          if (err) {
-            return response.status(StatusCodes.OK).send({
-              error: err,
-            });
-          }
-          console.log('New user', newUser);
-          sendConfirmationMail(
-            newUser.name,
-            newUser.email,
-            newUser.confirmationCode
-          );
-          return response.status(StatusCodes.OK).send({
-            data: 'Sign up success! Please signin.',
-          });
-        });
-      })
-      .catch((error) => {
-        return response.status(StatusCodes.BAD_REQUEST).send({
-          error: error,
-        });
-      });
+  signup: async (request, response, next) => {
+    let user = await User.findOne({ email: request.body.email }).catch(
+      (error) => next(error)
+    );
+    if (user) {
+      return next(
+        new CustomError(StatusCodes.BAD_REQUEST, 'Email already taken')
+      );
+    }
+    const { name, email, password } = request.body;
+    let username = shortid.generate();
+    let profile = `http://localhost:4200/user/${username}`;
+    let confirmationCode =
+      Date.now().toString(36) + Math.random().toString(36).substr(2);
+    const newUser = new User({
+      name,
+      email,
+      password,
+      profile,
+      username,
+      confirmationCode,
+    });
+    await newUser.save().catch((error) => next(error));
+    sendConfirmationMail(newUser.name, newUser.email, newUser.confirmationCode);
+    return response.status(StatusCodes.OK).send({
+      data: 'Sign up success! Please signin.',
+    });
   },
 
-  validateTokenController: (req, res) => {
-    console.log(req.body);
-    const isTokenValid = jwt.verify(req.body.token, 'AVINASH');
-    console.log(isTokenValid);
-  },
-
-  verifyUser: (req, res) => {
-    console.log(req.params.confirmationCode);
-    User.findOne({
+  verifyUser: async (req, res, next) => {
+    let user = User.findOne({
       confirmationCode: req.params.confirmationCode,
-    })
-      .then((user) => {
-        console.log(user);
-        if (!user) {
-          return res.status(401).send({ message: 'User Not found.' });
-        }
-        user.status = 'Active';
-        user.save((err) => {
-          if (err) {
-            res.status(500).send({ message: err });
-            return;
-          }
-          const token = jwt.sign(
-            {
-              name: user.name,
-              id: user._id,
-            },
-            'AVINASH',
-            { expiresIn: '1d' }
-          );
-          const { _id, username, name, email, role } = user;
-          return res.status(StatusCodes.OK).send({
-            token,
-            user: { _id, username, name, email, role },
-          });
-        });
-      })
-      .catch((e) => console.log('error', e));
+    }).catch((error) => next(error));
+    if (!user) {
+      return next(new CustomError(StatusCodes.UNAUTHORIZED, 'User Not found.'));
+    }
+    user.status = 'Active';
+    await user.save().catch((error) => next(error));
+    const token = jwt.sign(
+      {
+        name: user.name,
+        id: user._id,
+      },
+      'AVINASH',
+      { expiresIn: '1d' }
+    );
+    const { _id, username, name, email, role } = user;
+    return res.status(StatusCodes.OK).send({
+      token,
+      user: { _id, username, name, email, role },
+    });
   },
 
-  generatePasswordLink: async (req, res) => {
+  generatePasswordLink: async (req, res, next) => {
     if (!req.body.email) {
-      return res.status(400).send({ message: 'Email is required' });
+      return next(new CustomError(StatusCodes.BAD_REQUEST, 'User Not found.'));
     }
     const user = await User.findOne({ email: req.body.email });
     if (!user) {
-      return res.status(400).send({ message: 'Email is not found' });
+      return next(new CustomError(StatusCodes.NOT_FOUND, 'User Not found.'));
     }
-    console.log('User', user);
     let resetToken = new PasswordReset({
       user: user._id,
       resettoken:

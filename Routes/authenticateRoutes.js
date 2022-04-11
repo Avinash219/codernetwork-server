@@ -4,7 +4,6 @@ const {
   login,
   verifyUser,
   signup,
-  validateTokenController,
   generatePasswordLink,
   resetPassword,
 } = require('../Controller/authenticateController');

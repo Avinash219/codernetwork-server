@@ -9,6 +9,7 @@ module.exports = {
     Post.find(
       searchParam ? { post: { $regex: searchParam, $options: '$i' } } : {}
     )
+      .select('-comments')
       .limit(parseInt(limit))
       .skip(parseInt(currentPage) * parseInt(limit))
       .exec((err, result) => {
@@ -92,5 +93,45 @@ module.exports = {
         data: result,
       });
     });
+  },
+  addComment: (request, response) => {
+    const comment = {
+      text: request.body.comment,
+      postedBy: request.body.userId,
+    };
+    console.log(comment);
+    Post.findByIdAndUpdate(
+      request.body.id,
+      {
+        $push: { comments: comment },
+      },
+      {
+        new: true,
+      }
+    ).exec((err, result) => {
+      if (err) {
+        return response.status(StatusCodes.BAD_REQUEST).send({
+          error: err,
+        });
+      }
+      return response.status(StatusCodes.OK).send({
+        data: result,
+      });
+    });
+  },
+
+  getComment: (req, response) => {
+    Post.findById({ _id: req.params.id })
+      .select('comments.text')
+      .exec((err, result) => {
+        if (err) {
+          return response.status(StatusCodes.BAD_REQUEST).send({
+            error: err,
+          });
+        }
+        return response.status(StatusCodes.OK).send({
+          data: result,
+        });
+      });
   },
 };
