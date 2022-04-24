@@ -11,6 +11,7 @@ const userRouter = require('./Routes/userRoutes');
 
 const { loggerMiddleware } = require('./Middleware/loggerMiddleware');
 
+console.log(process.env);
 if (process.env.NODE_ENV !== 'PRODUCTION') {
   require('dotenv').config();
   console.log(process.env.PORT);
