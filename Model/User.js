@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const crypto = require('crypto');
+const { ObjectId } = mongoose.Schema;
 
 const userSchema = new mongoose.Schema(
   {
@@ -54,6 +55,24 @@ const userSchema = new mongoose.Schema(
     resetPasswordLink: {
       data: String,
       default: '',
+    },
+    mediumUrl: {
+      type: String,
+    },
+    linkedinUrl: {
+      type: String,
+    },
+    githubUrl: {
+      type: String,
+    },
+    technologyStack: [
+      {
+        type: ObjectId,
+        ref: 'TechStack',
+      },
+    ],
+    experience: {
+      type: Number,
     },
   },
   { timestamps: true }

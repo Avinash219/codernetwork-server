@@ -1,16 +1,18 @@
+const { USER_AUTHENTICATE } = require('../error-message-constant');
+
 const { StatusCodes } = require('http-status-codes');
 const jwt = require('jsonwebtoken');
 const User = require('../Model/User');
 
-module.exports = (req, response, next) => {
-  const { authorization } = req.headers;
+module.exports = (request, response, next) => {
+  const { authorization } = request.headers;
   if (!authorization) {
     return response.status(StatusCodes.BAD_REQUEST).send({
-      error: 'User is not authorized',
+      error: USER_AUTHENTICATE.UNAUTHORIZED_USER,
     });
   }
   const token = authorization.replace('Bearer', '');
-  jwt.verify(token, 'AVINASH', (err, payload) => {
+  jwt.verify(token, process.env.AUTHENTICATION_JWT_SECRET, (err, payload) => {
     if (err) {
       return response.status(StatusCodes.BAD_REQUEST).send({
         error: err,
@@ -19,7 +21,7 @@ module.exports = (req, response, next) => {
     const { id } = payload;
     User.findById({ _id: id })
       .then((userdata) => {
-        req.user = userdata;
+        request.user = userdata;
         next();
       })
       .catch((error) => {

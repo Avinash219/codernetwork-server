@@ -1,0 +1,8 @@
+{
+    "compilerOptions": {
+       "target": "es6",
+       "esModuleInterop":true,
+       "allowSyntheticDefaultImports": true
+    },
+    "module": "es2015"
+ }

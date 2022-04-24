@@ -1,32 +1,29 @@
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Schema;
 
-const postSchema = new mongoose.Schema(
+const tipSchema = new mongoose.Schema(
   {
-    post: {
+    tip: {
       type: String,
       min: 3,
       max: 2000,
       required: true,
       trim: true,
     },
-    author: {
+    tipAddedBy: {
       type: ObjectId,
       ref: 'User',
     },
-    comments: [
-      {
-        text: String,
-        postedBy: {
-          type: ObjectId,
-          ref: 'User',
-        },
-      },
-    ],
     likes: [
       {
         type: ObjectId,
         ref: 'User',
+      },
+    ],
+    tipTags: [
+      {
+        type: ObjectId,
+        ref: 'Tag',
       },
     ],
     dislikes: [
@@ -39,4 +36,4 @@ const postSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model('Post', postSchema);
+module.exports = mongoose.model('Tip', tipSchema);

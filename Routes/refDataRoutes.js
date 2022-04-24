@@ -1,15 +1,9 @@
 const express = require('express');
-const {
-  getRefData,
-  addRefData,
-  addRefDataType,
-  addRefDataValue,
-} = require('../Controller/RefDataController');
+const { addTag, getAllTags } = require('../Controller/tagController');
 
 const refDataRouter = express.Router();
 
-refDataRouter.post('/addRefDataType', addRefDataType);
-refDataRouter.get('/getRefData', getRefData);
-refDataRouter.put('/addRefDataValue/:refDataType', addRefDataValue);
+refDataRouter.post('/addTag', addTag);
+refDataRouter.get('/getTagList', getAllTags);
 
 module.exports = refDataRouter;

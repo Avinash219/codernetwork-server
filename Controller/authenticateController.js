@@ -1,7 +1,7 @@
 const { StatusCodes } = require('http-status-codes');
-const passport = require('passport');
 const jwt = require('jsonwebtoken');
 const shortid = require('shortid');
+const _ = require('underscore');
 
 const User = require('../Model/User');
 const {
@@ -9,67 +9,69 @@ const {
   generatePasswordLink,
 } = require('../Config/nodemailer.config');
 const PasswordReset = require('../Model/PasswordReset');
-const _ = require('underscore');
 const CustomError = require('../Middleware/Error/CustomError');
-const clientErrorHandler = require('../Middleware/Error/clientErrorHandler');
+const { USER_AUTHENTICATE } = require('../error-message-constant');
+const { USER_STATUS, SUCCESS_MESSAGE } = require('../global-constant');
 
 module.exports = {
-  login: (request, response, next) => {
-    const { email, password } = request.body;
-    User.findOne({ email })
-      .then((user) => {
-        if (!user) {
-          return next(
-            new CustomError(
-              StatusCodes.BAD_REQUEST,
-              'User with email does not exist! Please signup'
-            )
-          );
-        } else if (user.status !== 'Active') {
-          return next(
-            new CustomError(
-              StatusCodes.UNAUTHORIZED,
-              'Please confirm your email before login.'
-            )
-          );
-        } else if (!user.validatePassword(password)) {
-          return next(
-            new CustomError(
-              StatusCodes.BAD_REQUEST,
-              'Email and password do not match'
-            )
-          );
-        }
-        const token = jwt.sign(
-          {
-            name: user.name,
-            id: user._id,
-          },
-          'AVINASH',
-          { expiresIn: 60 * 60 * 24 }
-        );
-        const { _id, username, name, email, role } = user;
-        return response.status(StatusCodes.OK).send({
-          token,
-          user: { _id, username, name, email, role },
-        });
-      })
-      .catch((error) => {
-        next(error);
-      });
+  login: async (request, response, next) => {
+    const { userEmail, password } = request.body;
+    let userDetail = await User.findOne({ userEmail }).catch((error) =>
+      next(error)
+    );
+
+    if (!userDetail) {
+      return next(
+        new CustomError(
+          StatusCodes.BAD_REQUEST,
+          USER_AUTHENTICATE.INVALID_EMAIL
+        )
+      );
+    } else if (user.status !== USER_STATUS.ACTIVE) {
+      return next(
+        new CustomError(
+          StatusCodes.UNAUTHORIZED,
+          USER_AUTHENTICATE.CONFIRMATION_PENDING
+        )
+      );
+    } else if (!user.validatePassword(password)) {
+      return next(
+        new CustomError(
+          StatusCodes.BAD_REQUEST,
+          USER_AUTHENTICATE.USER_PASSWORD_MISMATCH
+        )
+      );
+    }
+    const token = jwt.sign(
+      {
+        name: user.name,
+        id: user._id,
+      },
+      process.env.AUTHENTICATION_JWT_SECRET,
+      { expiresIn: process.env.EXPIRATION_TIME }
+    );
+    const { _id, username, name, email, role } = user;
+    return response.status(StatusCodes.OK).send({
+      token,
+      user: { _id, username, name, email, role },
+    });
   },
+
   signup: async (request, response, next) => {
     let user = await User.findOne({ email: request.body.email }).catch(
       (error) => next(error)
     );
     if (user) {
       return next(
-        new CustomError(StatusCodes.BAD_REQUEST, 'Email already taken')
+        new CustomError(
+          StatusCodes.BAD_REQUEST,
+          USER_AUTHENTICATE.DUPLICATE_EMAIL
+        )
       );
     }
     const { name, email, password } = request.body;
     let username = shortid.generate();
-    let profile = `http://localhost:4200/user/${username}`;
+    let profile = `${process.env.PROFILE_URL}${username}`;
     let confirmationCode =
       Date.now().toString(36) + Math.random().toString(36).substr(2);
     const newUser = new User({
@@ -83,75 +85,86 @@ module.exports = {
     await newUser.save().catch((error) => next(error));
     sendConfirmationMail(newUser.name, newUser.email, newUser.confirmationCode);
     return response.status(StatusCodes.OK).send({
-      data: 'Sign up success! Please signin.',
+      data: SUCCESS_MESSAGE.SIGNIN_SUCCESS,
     });
   },
 
-  verifyUser: async (req, res, next) => {
-    let user = User.findOne({
-      confirmationCode: req.params.confirmationCode,
+  verifyUser: async (request, response, next) => {
+    let user = await User.findOne({
+      confirmationCode: request.params.confirmationCode,
     }).catch((error) => next(error));
+
     if (!user) {
-      return next(new CustomError(StatusCodes.UNAUTHORIZED, 'User Not found.'));
+      return next(
+        new CustomError(
+          StatusCodes.UNAUTHORIZED,
+          USER_AUTHENTICATE.USER_NOT_FOUND
+        )
+      );
     }
-    user.status = 'Active';
+    user.status = USER_STATUS.ACTIVE;
     await user.save().catch((error) => next(error));
     const token = jwt.sign(
       {
         name: user.name,
         id: user._id,
       },
-      'AVINASH',
-      { expiresIn: '1d' }
+      process.env.AUTHENTICATION_JWT_SECRET,
+      { expiresIn: process.env.EXPIRATION_TIME }
     );
     const { _id, username, name, email, role } = user;
-    return res.status(StatusCodes.OK).send({
+    return response.status(StatusCodes.OK).send({
       token,
       user: { _id, username, name, email, role },
     });
   },
 
-  generatePasswordLink: async (req, res, next) => {
-    if (!req.body.email) {
-      return next(new CustomError(StatusCodes.BAD_REQUEST, 'User Not found.'));
+  generatePasswordLink: async (request, response, next) => {
+    if (!request.body.email) {
+      return next(
+        new CustomError(
+          StatusCodes.BAD_REQUEST,
+          USER_AUTHENTICATE.USER_NOT_FOUND
+        )
+      );
     }
-    const user = await User.findOne({ email: req.body.email });
+    const user = await User.findOne({ email: request.body.email });
     if (!user) {
-      return next(new CustomError(StatusCodes.NOT_FOUND, 'User Not found.'));
+      return next(
+        new CustomError(StatusCodes.NOT_FOUND, USER_AUTHENTICATE.USER_NOT_FOUND)
+      );
     }
     let resetToken = new PasswordReset({
       user: user._id,
       resettoken:
         Date.now().toString(36) + Math.random().toString(36).substr(2),
     });
-    resetToken.save((err) => {
-      if (err) {
-        res.status(500).send({ message: err });
-        return;
-      }
-      PasswordReset.find({
-        _userId: user._id,
-        resettoken: { $ne: resetToken.resettoken },
-      })
-        .remove()
-        .exec();
-      res.status(200).json({ message: 'Reset Password successfully.' });
-      generatePasswordLink(user.name, user.email, resetToken.resettoken);
-    });
+    await resetToken.save().catch((error) => next(error));
+    await PasswordReset.find({
+      _userId: user._id,
+      resettoken: { $ne: resetToken.resettoken },
+    })
+      .remove()
+      .exec()
+      .catch((error) => next(error));
+
+    response
+      .status(200)
+      .json({ message: SUCCESS_MESSAGE.RESET_PASSWORD_SUCCESS });
+    generatePasswordLink(user.name, user.email, resetToken.resettoken);
   },
 
-  resetPassword: async (req, res) => {
-    let token = req.body.token;
-    let user = await User.findOne({ email: req.body.email });
+  resetPassword: async (request, response) => {
+    let user = await User.findOne({ email: request.body.email });
     let userId = user._id;
-    console.log('Req', req.body.password);
-    console.log('User', userId);
     let passwordResetToken = await PasswordReset.findOne({ userId });
 
-    user = _.extend(user, { password: req.body.password });
+    user = _.extend(user, { password: request.body.password });
     await user.save();
 
-    res.status(200).json({ message: 'Reset Password successfully.' });
+    response
+      .status(200)
+      .json({ message: SUCCESS_MESSAGE.RESET_PASSWORD_SUCCESS });
     //await PasswordReset.deleteOne();
   },
 };

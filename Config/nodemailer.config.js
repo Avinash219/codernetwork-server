@@ -1,7 +1,12 @@
 const nodemailer = require('nodemailer');
 
-const username = 'watchlist.dev@gmail.com';
-const password = 'medium@13';
+const {
+  CONFIRMATION_CONSTANT,
+  GENERATE_PASSWORD_CONSTANT,
+} = require('./config-constant');
+
+const username = process.env.USERNAME;
+const password = process.env.PASSWORD;
 
 const transport = nodemailer.createTransport({
   service: 'Gmail',
@@ -17,11 +22,11 @@ module.exports = {
       .sendMail({
         from: username,
         to: email,
-        subject: 'Pleas confirm your account',
-        html: `<h1>Email Confirmation</h1>
-        <h2>Hello ${name}</h2>
-        <p>Thank you for subscribing. Please confirm your email by clicking on the following link</p>
-        <a href=http://localhost:4200/#/confirm/${confirmationCode}> Click here</a>
+        subject: CONFIRMATION_CONSTANT.SUBJECT,
+        html: `<h1>${CONFIRMATION_CONSTANT.EMAIL}</h1>
+        <h2>${CONFIRMATION_CONSTANT.HELLO_STRING} ${name}</h2>
+        <p>${CONFIRMATION_CONSTANT.BODY}</p>
+        <a href=${process.env.CONFIRM_ACCOUNT_URL}${confirmationCode}> ${CONFIRMATION_CONSTANT.CLICK_CONSTANT}</a>
         </div>`,
       })
       .catch((err) => console.log(err));
@@ -31,11 +36,11 @@ module.exports = {
       .sendMail({
         from: username,
         to: email,
-        subject: 'Password Reset',
-        html: `<h1>Password Reset</h1>
-        <h2>Hello ${name}</h2>
-        <p>You have received the mail because you have request for Password reset</p>
-        <a href=http://localhost:4200/#/reset-password/${token}> Click here</a>
+        subject: `${GENERATE_PASSWORD_CONSTANT.SUBJECT}`,
+        html: `<h1>${GENERATE_PASSWORD_CONSTANT.EMAIL}</h1>
+        <h2>${GENERATE_PASSWORD_CONSTANT.HELLO_STRING} ${name}</h2>
+        <p>${GENERATE_PASSWORD_CONSTANT.BODY}</p>
+        <a href=${process.env.RESET_PASSWORD_URL}${token}> Click here</a>
         </div>`,
       })
       .catch((err) => console.log(err));

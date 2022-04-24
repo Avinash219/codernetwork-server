@@ -8,12 +8,15 @@ require('./Config/passport');
 
 const authenticateRouter = require('./Routes/authenticateRoutes');
 const userRouter = require('./Routes/userRoutes');
-const postRouter = require('./Routes/postRoutes');
-const adminRoutes = require('./Routes/adminRoutes');
 
 const { loggerMiddleware } = require('./Middleware/loggerMiddleware');
 
-mongoose.connect('mongodb://localhost:27017/watchlist', {
+if (process.env.NODE_ENV !== 'PRODUCTION') {
+  require('dotenv').config();
+  console.log(process.env.PORT);
+}
+
+mongoose.connect(process.env.MONGOOSE_URL, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
@@ -36,20 +39,22 @@ var path = require('path');
 const logError = require('./Middleware/Error/logError');
 const clientErrorHandler = require('./Middleware/Error/clientErrorHandler');
 const refDataRouter = require('./Routes/refDataRoutes');
+const questionAnswerRouter = require('./Routes/questionAnswerRoutes');
+const tipRouter = require('./Routes/TipRoutes');
 
-app.use('/api/admin', adminRoutes);
 app.use('/api/authenticate', authenticateRouter);
 app.use('/api/profile', userRouter);
-app.use('/api/post', postRouter);
 app.use('/api/refData', refDataRouter);
+app.use('/api/questionAnswer', questionAnswerRouter);
+app.use('/api/tip', tipRouter);
 
 app.use('/public', express.static(path.join(__dirname, 'public')));
 
 app.use(logError);
 app.use(clientErrorHandler);
 
-const server = app.listen(PORT, () => {
-  console.log(`Server is running on ${PORT}`);
+const server = app.listen(process.env.PORT, () => {
+  console.log(`Server is running on ${process.env.PORT}`);
 });
 
 const io = socketIo(server, {

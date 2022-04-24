@@ -5,12 +5,19 @@ const fs = require('fs');
 
 module.exports = {
   updateProfile: async (request, response) => {
-    imagePath = 'http://localhost:3000/public/' + request.file.filename;
+    let imagePath = null;
+    if (request.file && request.file.filename) {
+      imagePath = 'http://localhost:3000/public/' + request.file.filename;
+    }
 
     let userObj = {
       username: request.body.username,
       imageDetails: imagePath,
       about: request.body.about,
+      mediumUrl: request.body.mediumUrl,
+      linkedinUrl: request.body.linkedinUrl,
+      githubUrl: request.body.githubUrl,
+      experience: request.body.experience,
     };
     let username = userObj.username;
     const userDetail = await User.findOneAndUpdate(
@@ -23,8 +30,8 @@ module.exports = {
       user: userDetail,
     });
   },
-  photo: (req, res) => {
-    const username = req.params.username;
+  photo: (request, response) => {
+    const username = request.params.username;
     User.findOne({ username })
       .then((user) => {
         if (!user) {
@@ -33,7 +40,7 @@ module.exports = {
           });
         }
         if (user.photo.data) {
-          res.set('Content-Type', user.photo.contentType);
+          response.set('Content-Type', user.photo.contentType);
           return response.status(StatusCodes.BAD_REQUEST).send({
             error: user.photo.data,
           });

@@ -1,6 +1,8 @@
-const loggerMiddleware = (req, res, next) => {
+const loggerMiddleware = (request, response, next) => {
   console.log(
-    `Request is ${req.url} - ${req.method} - ${new Date().toISOString()}`
+    `Request is ${request.url} - ${
+      request.method
+    } - ${new Date().toISOString()}`
   );
   next();
 };

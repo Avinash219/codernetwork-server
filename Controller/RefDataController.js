@@ -4,7 +4,6 @@ const RefData = require('../Model/RefData');
 module.exports = {
   getRefData: async (request, response) => {
     const fetchRefDataType = request.query.refDataType;
-    console.log('fetchRefDataType', fetchRefDataType);
     let refDataDetail = await RefData.find(
       fetchRefDataType
         ? {
@@ -20,8 +19,6 @@ module.exports = {
   addRefDataValue: async (request, response) => {
     let refDataType = request.params.refDataType;
     let newRefDataValue = request.body.refDataValue;
-    console.log('Ref Data', refDataType);
-    console.log('Ref Type', newRefDataValue);
     let updatedRefData = await RefData.findOneAndUpdate(
       { refDataType: refDataType },
       {
